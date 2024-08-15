@@ -1,5 +1,8 @@
 #! /bin/bash
 
+# After a completed build, you can use the following command to skip building arrow/velox.
+# ./build.sh --enable_ep_cache=ON --build_arrow=OFF
+
 set -exu
 
 PROJECT_DIR="$(cd "$(dirname $0)"; pwd)"
@@ -18,6 +21,7 @@ docker build \
 docker run -it --rm \
   --network=host \
   -v ${PROJECT_DIR}:${PROJECT_DIR} \
+  -v ${PROJECT_DIR}/ep/_ep/install:/usr/local \
   ${DOCKER_IMG} \
   sh -c \
   "cd ${PROJECT_DIR} && \
