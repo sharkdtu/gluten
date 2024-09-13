@@ -134,7 +134,55 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
     GlutenEventUtils.post(sc, event)
   }
 
+  private def prepareForGemini(conf: SparkConf): Unit = {
+    if (conf.getBoolean(GlutenConfig.GLUTEN_DYNAMIC_OFFHEAP_SIZING_ENABLED, false)) {
+      throw new IllegalArgumentException(
+        s"${GlutenConfig.GLUTEN_GEMINI_OFFHEAP_ENABLED} and " +
+          s"${GlutenConfig.GLUTEN_DYNAMIC_OFFHEAP_SIZING_ENABLED} " +
+          "are logically conflicting, can not be set to true at the same time.")
+    }
+
+    conf.set(GlutenConfig.GLUTEN_OFFHEAP_ENABLED, "true")
+    if (conf.getBoolean(GlutenConfig.GLUTEN_GEMINI_COLUMNAR_SHUFFLE_ENABLED, true)) {
+      conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
+    }
+
+    val totalMemoryBytes = conf.getSizeAsBytes(GlutenConfig.GLUTEN_ONHEAP_SIZE_KEY)
+    val offHeapFraction = conf.getDouble(GlutenConfig.GLUTEN_GEMINI_OFFHEAP_FRACTION, 0.75)
+    if (offHeapFraction < 0 || offHeapFraction >= 1) {
+      throw new IllegalArgumentException(
+        s"${GlutenConfig.GLUTEN_GEMINI_OFFHEAP_FRACTION} should be within 0 to 1");
+    }
+
+    val overheadFactor =
+      conf.getDouble(
+        "spark.executor.memoryOverheadFactor",
+        conf.getDouble("spark.kubernetes.memoryOverheadFactor", 0.15)
+      )
+
+    if (!conf.contains("spark.executor.memoryOverhead")) {
+      conf.set(
+        "spark.executor.memoryOverhead",
+        Math.max(384, (totalMemoryBytes * overheadFactor).toLong / (1024 * 1024)).toString + "m")
+    }
+
+    val offHeapBytes = (totalMemoryBytes * offHeapFraction).toLong
+    val onHeapBytes = totalMemoryBytes - offHeapBytes
+
+    val onHeapSizeConfValue = (onHeapBytes / (1024 * 1024)) + "m"
+    val offHeapSizeConfValue = (offHeapBytes / (1024 * 1024)) + "m"
+
+    conf.set(GlutenConfig.GLUTEN_ONHEAP_SIZE_KEY, onHeapSizeConfValue)
+    conf.set(GlutenConfig.GLUTEN_OFFHEAP_SIZE_KEY, offHeapSizeConfValue)
+    logInfo(
+      s"Set on heap memory to $onHeapSizeConfValue and off heep memory to $offHeapSizeConfValue.")
+  }
+
   private def setPredefinedConfigs(sc: SparkContext, conf: SparkConf): Unit = {
+    if (conf.getBoolean(GlutenConfig.GLUTEN_GEMINI_OFFHEAP_ENABLED, true)) {
+      prepareForGemini(conf)
+    }
+
     // sql extensions
     val extensions = if (conf.contains(SPARK_SESSION_EXTS_KEY)) {
       s"${conf.get(SPARK_SESSION_EXTS_KEY)},$GLUTEN_SESSION_EXTENSION_NAME"
