@@ -1,4 +1,4 @@
-FROM mirrors.tencent.com/tlinux/tlinux3.2-minimal
+FROM mirrors.tencent.com/tlinux/tlinux3.2-minimal:v20221214
 
 MAINTAINER sharkdtu@tencent.com
 
