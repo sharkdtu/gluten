@@ -28,6 +28,13 @@
 
 namespace gluten {
 
+class WriteMetrics {
+ public:
+  WriteMetrics() {}
+
+  uint64_t numBytes = 0;
+};
+
 class Datasource {
  public:
   Datasource(const std::string& filePath, std::shared_ptr<arrow::Schema> schema)
@@ -37,8 +44,12 @@ class Datasource {
 
   virtual void init(const std::unordered_map<std::string, std::string>& sparkConfs) {}
   virtual void inspectSchema(struct ArrowSchema* out) = 0;
-  virtual void write(const std::shared_ptr<ColumnarBatch>& cb) {}
-  virtual void close() {}
+  virtual int64_t write(const std::shared_ptr<ColumnarBatch>& cb) {
+    return 0;
+  }
+  virtual std::shared_ptr<WriteMetrics> close() {
+    return nullptr;
+  }
   virtual std::shared_ptr<arrow::Schema> getSchema() = 0;
 
  private:

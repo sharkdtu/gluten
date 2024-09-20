@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.datasources
 
 import org.apache.gluten.backendsapi.BackendsApiManager
-import org.apache.gluten.execution.ColumnarToRowExecBase
+import org.apache.gluten.execution.{ColumnarToRowExecBase, WriteAnalyzeFactory}
 import org.apache.gluten.extension.GlutenPlan
 import org.apache.gluten.extension.columnar.transition.Transitions
 
@@ -27,12 +27,13 @@ import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.expressions.{Attribute, SortOrder}
 import org.apache.spark.sql.catalyst.plans.logical.{LogicalPlan, OrderPreservingUnaryNode}
 import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.connector.write.Write
 import org.apache.spark.sql.execution._
 import org.apache.spark.sql.execution.adaptive.AdaptiveSparkPlanExec
 import org.apache.spark.sql.execution.command.{CreateDataSourceTableAsSelectCommand, DataWritingCommand, DataWritingCommandExec}
 import org.apache.spark.sql.execution.datasources.orc.OrcFileFormat
 import org.apache.spark.sql.execution.datasources.parquet.ParquetFileFormat
-import org.apache.spark.sql.execution.datasources.v2.{AppendDataExec, OverwriteByExpressionExec}
+import org.apache.spark.sql.execution.datasources.v2.{AppendDataExec, OverwriteByExpressionExec, OverwritePartitionsDynamicExec, V2TableWriteExec}
 import org.apache.spark.sql.hive.execution.{CreateHiveTableAsSelectCommand, InsertIntoHiveDirCommand, InsertIntoHiveTable}
 import org.apache.spark.sql.vectorized.ColumnarBatch
 
@@ -153,38 +154,65 @@ object GlutenWriterColumnarRules {
 
     private val NOOP_WRITE = "org.apache.spark.sql.execution.datasources.noop.NoopWrite$"
 
-    override def apply(p: SparkPlan): SparkPlan = p match {
-      case rc @ AppendDataExec(_, _, write)
-          if write.getClass.getName == NOOP_WRITE &&
-            BackendsApiManager.getSettings.enableNativeWriteFiles() =>
+    private def tryInjectFakeRowAdaptorForV2TableWriteExec(
+        rc: V2TableWriteExec,
+        write: Write): SparkPlan = {
+      val register = WriteAnalyzeFactory.createWriteAnalyze(write)
+
+      if (write.getClass.getName == NOOP_WRITE) {
         injectFakeRowAdaptor(rc, rc.child)
-      case rc @ OverwriteByExpressionExec(_, _, write)
-          if write.getClass.getName == NOOP_WRITE &&
-            BackendsApiManager.getSettings.enableNativeWriteFiles() =>
+      } else if (register.isDefined) {
+        logInfo(s"created write analyze: ${register.get.getClass.getName}.")
+        val info = register.get.getWriteInfo(write)
+        session.sparkContext.setLocalProperty("isNativeApplicable", "true")
+        info.writeFactoryClass.foreach {
+          clz => session.sparkContext.setLocalProperty("writerFactoryClassName", clz)
+        }
+        info.internalRowWrapperClass.foreach {
+          clz => session.sparkContext.setLocalProperty("internalRowWrapperClassName", clz)
+        }
+
         injectFakeRowAdaptor(rc, rc.child)
-      case rc @ DataWritingCommandExec(cmd, child) =>
-        // These properties can be set by the same thread in last query submission.
-        session.sparkContext.setLocalProperty("isNativeApplicable", null)
-        session.sparkContext.setLocalProperty("nativeFormat", null)
-        session.sparkContext.setLocalProperty("staticPartitionWriteOnly", null)
-        if (BackendsApiManager.getSettings.supportNativeWrite(child.output.toStructType.fields)) {
-          val format = getNativeFormat(cmd)
-          session.sparkContext.setLocalProperty(
-            "staticPartitionWriteOnly",
-            BackendsApiManager.getSettings.staticPartitionWriteOnly().toString)
-          // FIXME: We should only use context property if having no other approaches.
-          //  Should see if there is another way to pass these options.
-          session.sparkContext.setLocalProperty("isNativeApplicable", format.isDefined.toString)
-          session.sparkContext.setLocalProperty("nativeFormat", format.getOrElse(""))
-          if (format.isDefined) {
-            injectFakeRowAdaptor(rc, child)
+      } else {
+        rc
+      }
+    }
+
+    override def apply(p: SparkPlan): SparkPlan = {
+      p match {
+        case rc @ AppendDataExec(_, _, write)
+            if BackendsApiManager.getSettings.enableNativeWriteFiles() =>
+          tryInjectFakeRowAdaptorForV2TableWriteExec(rc, write)
+        case rc @ OverwriteByExpressionExec(_, _, write)
+            if BackendsApiManager.getSettings.enableNativeWriteFiles() =>
+          tryInjectFakeRowAdaptorForV2TableWriteExec(rc, write)
+        case rc @ OverwritePartitionsDynamicExec(_, _, write)
+            if BackendsApiManager.getSettings.enableNativeWriteFiles() =>
+          tryInjectFakeRowAdaptorForV2TableWriteExec(rc, write)
+        case rc @ DataWritingCommandExec(cmd, child) =>
+          // These properties can be set by the same thread in last query submission.
+          session.sparkContext.setLocalProperty("isNativeApplicable", null)
+          session.sparkContext.setLocalProperty("nativeFormat", null)
+          session.sparkContext.setLocalProperty("staticPartitionWriteOnly", null)
+          if (BackendsApiManager.getSettings.supportNativeWrite(child.output.toStructType.fields)) {
+            val format = getNativeFormat(cmd)
+            session.sparkContext.setLocalProperty(
+              "staticPartitionWriteOnly",
+              BackendsApiManager.getSettings.staticPartitionWriteOnly().toString)
+            // FIXME: We should only use context property if having no other approaches.
+            //  Should see if there is another way to pass these options.
+            session.sparkContext.setLocalProperty("isNativeApplicable", format.isDefined.toString)
+            session.sparkContext.setLocalProperty("nativeFormat", format.getOrElse(""))
+            if (format.isDefined) {
+              injectFakeRowAdaptor(rc, child)
+            } else {
+              rc.withNewChildren(rc.children.map(apply))
+            }
           } else {
             rc.withNewChildren(rc.children.map(apply))
           }
-        } else {
-          rc.withNewChildren(rc.children.map(apply))
-        }
-      case plan: SparkPlan => plan.withNewChildren(plan.children.map(apply))
+        case plan: SparkPlan => plan.withNewChildren(plan.children.map(apply))
+      }
     }
 
     private def injectFakeRowAdaptor(command: SparkPlan, child: SparkPlan): SparkPlan = {

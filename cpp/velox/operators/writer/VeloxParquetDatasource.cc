@@ -121,16 +121,21 @@ void VeloxParquetDatasource::inspectSchema(struct ArrowSchema* out) {
   toArrowSchema(reader->rowType(), pool_.get(), out);
 }
 
-void VeloxParquetDatasource::close() {
+std::shared_ptr<WriteMetrics> VeloxParquetDatasource::close() {
+  int64_t numBytes = -1;
   if (parquetWriter_) {
-    parquetWriter_->close();
+    numBytes = parquetWriter_->close();
   }
+
+  writeMetrics_->numBytes = numBytes;
+  return writeMetrics_;
 }
 
-void VeloxParquetDatasource::write(const std::shared_ptr<ColumnarBatch>& cb) {
+int64_t VeloxParquetDatasource::write(const std::shared_ptr<ColumnarBatch>& cb) {
   auto veloxBatch = std::dynamic_pointer_cast<VeloxColumnarBatch>(cb);
   VELOX_DCHECK(veloxBatch != nullptr, "Write batch should be VeloxColumnarBatch");
-  parquetWriter_->write(veloxBatch->getFlattenedRowVector());
+  const auto& data = veloxBatch->getFlattenedRowVector();
+  return parquetWriter_->write(data);
 }
 
 } // namespace gluten

@@ -70,3 +70,9 @@ class FakeRow(val batch: ColumnarBatch) extends InternalRow {
   override def get(ordinal: Int, dataType: DataType): AnyRef =
     throw new UnsupportedOperationException()
 }
+
+object FakeRow {
+  def toBatch(row: InternalRow): ColumnarBatch = {
+    row.asInstanceOf[FakeRow].batch
+  }
+}

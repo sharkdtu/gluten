@@ -24,6 +24,7 @@ import org.apache.gluten.substrait.rel.LocalFilesNode.ReadFileFormat
 import org.apache.gluten.substrait.rel.SplitInfo
 
 import org.apache.spark._
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.connector.read.InputPartition
 import org.apache.spark.sql.execution.metric.SQLMetric
 import org.apache.spark.sql.types.StructType
@@ -86,4 +87,8 @@ trait IteratorApi {
       partitionIndex: Int,
       materializeInput: Boolean = false): Iterator[ColumnarBatch]
   // scalastyle:on argcount
+
+  def getSampleRow(columnarBatch: ColumnarBatch): InternalRow = {
+    throw new UnsupportedOperationException("Not yet implemented")
+  }
 }

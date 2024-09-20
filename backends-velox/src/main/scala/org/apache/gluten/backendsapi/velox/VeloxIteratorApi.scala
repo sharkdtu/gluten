@@ -31,6 +31,7 @@ import org.apache.gluten.vectorized._
 import org.apache.spark.{SparkConf, TaskContext}
 import org.apache.spark.internal.Logging
 import org.apache.spark.softaffinity.SoftAffinity
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.catalyst.catalog.ExternalCatalogUtils
 import org.apache.spark.sql.catalyst.util.{DateFormatter, TimestampFormatter}
 import org.apache.spark.sql.connector.read.InputPartition
@@ -254,4 +255,13 @@ class VeloxIteratorApi extends IteratorApi with Logging {
       .create()
   }
   // scalastyle:on argcount
+
+  override def getSampleRow(columnarBatch: ColumnarBatch): InternalRow = {
+    val row = VeloxColumnarToRowExec.getSampleRow(columnarBatch)
+    if (row == null) {
+      throw new RuntimeException("sample row cannot be null")
+    }
+    row
+  }
+
 }

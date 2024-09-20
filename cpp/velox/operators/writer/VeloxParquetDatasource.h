@@ -86,13 +86,15 @@ class VeloxParquetDatasource : public Datasource {
       std::shared_ptr<facebook::velox::memory::MemoryPool> veloxPool,
       std::shared_ptr<facebook::velox::memory::MemoryPool> sinkPool,
       std::shared_ptr<arrow::Schema> schema)
-      : Datasource(filePath, schema), filePath_(filePath), schema_(schema), pool_(std::move(veloxPool)) {}
+      : Datasource(filePath, schema), filePath_(filePath), schema_(schema), pool_(std::move(veloxPool)) {
+    writeMetrics_ = std::make_shared<WriteMetrics>();
+  }
 
   void init(const std::unordered_map<std::string, std::string>& sparkConfs) override;
   virtual void initSink(const std::unordered_map<std::string, std::string>& sparkConfs);
   void inspectSchema(struct ArrowSchema* out) override;
-  void write(const std::shared_ptr<ColumnarBatch>& cb) override;
-  void close() override;
+  int64_t write(const std::shared_ptr<ColumnarBatch>& cb) override;
+  std::shared_ptr<WriteMetrics> close() override;
   std::shared_ptr<arrow::Schema> getSchema() override {
     return schema_;
   }
@@ -107,6 +109,7 @@ class VeloxParquetDatasource : public Datasource {
   int64_t maxRowGroupRows_ = 100000000; // 100M
 
   std::shared_ptr<arrow::Schema> schema_;
+  std::shared_ptr<WriteMetrics> writeMetrics_;
   std::shared_ptr<facebook::velox::parquet::Writer> parquetWriter_;
   std::shared_ptr<facebook::velox::memory::MemoryPool> pool_;
 };

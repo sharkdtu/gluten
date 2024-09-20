@@ -127,6 +127,73 @@
     <scalatest-maven-plugin.version>2.2.0</scalatest-maven-plugin.version>
   </properties>
 
+  <repositories>
+    <repository>
+      <id>central</id>
+      <name>Tencent Maven Central mirror</name>
+      <url>https://mirrors.tencent.com/nexus/repository/maven-public/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>tencent-public-repo</id>
+      <name>Tencent Public Repository</name>
+      <url>https://mirrors.tencent.com/repository/maven/tencent_public</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>tencent_public_snapshots</id>
+      <url>https://mirrors.tencent.com/repository/maven/tencent_public_snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>tianqiong-releases</id>
+      <name>TianQiong Release Repository</name>
+      <url>https://mirrors.tencent.com/repository/maven/tianqiong-releases</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>tianqiong-snapshots</id>
+      <url>https://mirrors.tencent.com/repository/maven/tianqiong-snapshots</url>
+      <releases>
+        <enabled>false</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>tencent-weixin</id>
+      <name>Tencent Weixin</name>
+      <url>https://mirrors.tencent.com/repository/maven/weixin/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
   <profiles>
     <profile>
       <id>scala-2.12</id>
@@ -273,8 +340,7 @@
         <sparkshim.module.name>spark33</sparkshim.module.name>
         <sparkshim.artifactId>spark-sql-columnar-shims-spark33</sparkshim.artifactId>
         <spark.version>3.3.1</spark.version>
-        <!-- keep using iceberg v1.3.1 for parquet compatibilty. -->
-        <iceberg.version>1.3.1</iceberg.version>
+        <iceberg.version>1.4.7-4-wx</iceberg.version>
         <delta.package.name>delta-core</delta.package.name>
         <delta.version>2.3.0</delta.version>
         <delta.binary.version>23</delta.binary.version>

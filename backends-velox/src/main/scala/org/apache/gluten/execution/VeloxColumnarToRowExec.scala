@@ -187,4 +187,30 @@ object VeloxColumnarToRowExec {
       }
       .create()
   }
+
+  def getSampleRow(batch: ColumnarBatch): InternalRow = {
+    if (batch.numRows == 0) {
+      throw new IllegalArgumentException("no row on batch");
+    }
+
+    if (batch.numCols() > 0 && !ColumnarBatches.isLightBatch(batch)) {
+      throw new RuntimeException("not support light batch")
+    } else {
+      val runtime = Runtimes.contextInstance("ColumnarToRow")
+      val jniWrapper = NativeColumnarToRowJniWrapper.create(runtime)
+      val c2rId = jniWrapper.nativeColumnarToRowInit()
+
+      val batchHandle = ColumnarBatches.getNativeHandle(batch)
+      val numRows = batch.numRows()
+      val info = jniWrapper.nativeColumnarToRowConvert(c2rId, batchHandle, numRows - 1)
+      if (info.lengths.length != 1 || info.offsets.length != 1) {
+        throw new RuntimeException("Only except getting one row from native")
+      }
+
+      val row = new UnsafeRow(batch.numCols())
+      row.pointTo(null, info.memoryAddress + info.offsets.head, info.lengths.head)
+      jniWrapper.nativeClose(c2rId)
+      row
+    }
+  }
 }

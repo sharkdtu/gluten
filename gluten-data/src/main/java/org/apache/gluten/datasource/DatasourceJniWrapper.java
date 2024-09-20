@@ -50,9 +50,9 @@ public class DatasourceJniWrapper implements RuntimeAware {
 
   public native void inspectSchema(long dsHandle, long cSchemaAddress);
 
-  public native void close(long dsHandle);
+  public native NativeBatchWriteInfo close(long dsHandle);
 
-  public native void writeBatch(long dsHandle, long batchHandle);
+  public native NativeBatchWriteInfo writeBatch(long dsHandle, long batchHandle);
 
   public native BlockStripes splitBlockByPartitionAndBucket(
       long blockAddress, int[] partitionColIndice, boolean hasBucket);

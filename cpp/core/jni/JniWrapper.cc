@@ -66,6 +66,9 @@ static jmethodID metricsBuilderConstructor;
 static jclass nativeColumnarToRowInfoClass;
 static jmethodID nativeColumnarToRowInfoConstructor;
 
+static jclass nativeBatchWriteInfoClass;
+static jmethodID nativeBatchWriteInfoConstructor;
+
 static jclass shuffleReaderMetricsClass;
 static jmethodID shuffleReaderMetricsSetDecompressTime;
 static jmethodID shuffleReaderMetricsSetDeserializeTime;
@@ -181,6 +184,10 @@ jint JNI_OnLoad(JavaVM* vm, void* reserved) {
       createGlobalClassReferenceOrError(env, "Lorg/apache/gluten/vectorized/NativeColumnarToRowInfo;");
   nativeColumnarToRowInfoConstructor = getMethodIdOrError(env, nativeColumnarToRowInfoClass, "<init>", "([I[IJ)V");
 
+  nativeBatchWriteInfoClass =
+      createGlobalClassReferenceOrError(env, "Lorg/apache/gluten/datasource/NativeBatchWriteInfo;");
+  nativeBatchWriteInfoConstructor = getMethodIdOrError(env, nativeBatchWriteInfoClass, "<init>", "(J)V");
+
   javaReservationListenerClass = createGlobalClassReference(
       env,
       "Lorg/apache/gluten/memory/listener/"
@@ -210,6 +217,7 @@ void JNI_OnUnload(JavaVM* vm, void* reserved) {
   env->DeleteGlobalRef(splitResultClass);
   env->DeleteGlobalRef(columnarBatchSerializeResultClass);
   env->DeleteGlobalRef(nativeColumnarToRowInfoClass);
+  env->DeleteGlobalRef(nativeBatchWriteInfoClass);
   env->DeleteGlobalRef(byteArrayClass);
   env->DeleteGlobalRef(shuffleReaderMetricsClass);
   env->DeleteGlobalRef(blockStripesClass);
@@ -1112,18 +1120,22 @@ JNIEXPORT void JNICALL Java_org_apache_gluten_datasource_DatasourceJniWrapper_in
   JNI_METHOD_END()
 }
 
-JNIEXPORT void JNICALL Java_org_apache_gluten_datasource_DatasourceJniWrapper_close( // NOLINT
+JNIEXPORT jobject JNICALL Java_org_apache_gluten_datasource_DatasourceJniWrapper_close( // NOLINT
     JNIEnv* env,
     jobject wrapper,
     jlong dsHandle) {
   JNI_METHOD_START
   auto datasource = ObjectStore::retrieve<Datasource>(dsHandle);
-  datasource->close();
+  auto metrics = datasource->close();
+
+  jobject nativeBatchWriteInfo =
+      env->NewObject(nativeBatchWriteInfoClass, nativeBatchWriteInfoConstructor, metrics->numBytes);
   ObjectStore::release(dsHandle);
-  JNI_METHOD_END()
+  return nativeBatchWriteInfo;
+  JNI_METHOD_END(nullptr)
 }
 
-JNIEXPORT void JNICALL Java_org_apache_gluten_datasource_DatasourceJniWrapper_writeBatch( // NOLINT
+JNIEXPORT jobject JNICALL Java_org_apache_gluten_datasource_DatasourceJniWrapper_writeBatch( // NOLINT
     JNIEnv* env,
     jobject wrapper,
     jlong dsHandle,
@@ -1132,8 +1144,10 @@ JNIEXPORT void JNICALL Java_org_apache_gluten_datasource_DatasourceJniWrapper_wr
   auto ctx = gluten::getRuntime(env, wrapper);
   auto datasource = ObjectStore::retrieve<Datasource>(dsHandle);
   auto batch = ObjectStore::retrieve<ColumnarBatch>(batchHandle);
-  datasource->write(batch);
-  JNI_METHOD_END()
+  auto numBytes = datasource->write(batch);
+  jobject nativeBatchWriteInfo = env->NewObject(nativeBatchWriteInfoClass, nativeBatchWriteInfoConstructor, numBytes);
+  return nativeBatchWriteInfo;
+  JNI_METHOD_END(nullptr)
 }
 
 JNIEXPORT jobject JNICALL

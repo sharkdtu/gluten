@@ -17,7 +17,7 @@
 package org.apache.spark.sql.execution.datasources.velox
 
 import org.apache.gluten.columnarbatch.{ColumnarBatches, ColumnarBatchJniWrapper}
-import org.apache.gluten.datasource.DatasourceJniWrapper
+import org.apache.gluten.datasource.{DatasourceJniWrapper, NativeBatchWriteInfo}
 import org.apache.gluten.exception.GlutenException
 import org.apache.gluten.execution.datasource.GlutenRowSplitter
 import org.apache.gluten.memory.arrow.alloc.ArrowBufferAllocators
@@ -33,8 +33,8 @@ import org.apache.spark.sql.utils.SparkArrowUtil
 
 import com.google.common.base.Preconditions
 import org.apache.arrow.c.ArrowSchema
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.{FileStatus, Path}
-import org.apache.hadoop.mapreduce.TaskAttemptContext
 
 import java.io.IOException
 
@@ -42,13 +42,13 @@ trait VeloxFormatWriterInjects extends GlutenFormatWriterInjectsBase {
   def createOutputWriter(
       filePath: String,
       dataSchema: StructType,
-      context: TaskAttemptContext,
+      conf: Configuration,
       nativeConf: java.util.Map[String, String]): OutputWriter = {
     // Create the hdfs path if not existed.
     val hdfsSchema = "hdfs://"
     if (filePath.startsWith(hdfsSchema)) {
       val hdfsPath = new Path(filePath)
-      val fs = hdfsPath.getFileSystem(context.getConfiguration)
+      val fs = hdfsPath.getFileSystem(conf)
       if (!fs.exists(hdfsPath.getParent)) {
         fs.mkdirs(hdfsPath.getParent)
       }
@@ -72,8 +72,8 @@ trait VeloxFormatWriterInjects extends GlutenFormatWriterInjectsBase {
       cSchema.close()
     }
 
-    new OutputWriter {
-      override def write(row: InternalRow): Unit = {
+    new GlutenOutputWriter {
+      override def writeAndCollectInfo(row: InternalRow): NativeBatchWriteInfo = {
         val batch = row.asInstanceOf[FakeRow].batch
         Preconditions.checkState(ColumnarBatches.isLightBatch(batch))
         ColumnarBatches.retain(batch)
@@ -87,11 +87,12 @@ trait VeloxFormatWriterInjects extends GlutenFormatWriterInjectsBase {
             ColumnarBatches.getNativeHandle(offloaded)
           }
         }
-        datasourceJniWrapper.writeBatch(dsHandle, batchHandle)
+        val info = datasourceJniWrapper.writeBatch(dsHandle, batchHandle)
         batch.close()
+        info
       }
 
-      override def close(): Unit = {
+      override def closeAndCollectInfo(): NativeBatchWriteInfo = {
         datasourceJniWrapper.close(dsHandle)
       }
 

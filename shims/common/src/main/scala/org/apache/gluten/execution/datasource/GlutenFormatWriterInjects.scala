@@ -24,6 +24,7 @@ import org.apache.spark.sql.execution.SparkPlan
 import org.apache.spark.sql.execution.datasources.{BlockStripes, FakeRow, OutputWriter}
 import org.apache.spark.sql.types.StructType
 
+import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.FileStatus
 import org.apache.hadoop.mapreduce.TaskAttemptContext
 
@@ -32,6 +33,14 @@ trait GlutenFormatWriterInjects {
       path: String,
       dataSchema: StructType,
       context: TaskAttemptContext,
+      nativeConf: java.util.Map[String, String]): OutputWriter = {
+    createOutputWriter(path, dataSchema, context.getConfiguration, nativeConf)
+  }
+
+  def createOutputWriter(
+      path: String,
+      dataSchema: StructType,
+      conf: Configuration,
       nativeConf: java.util.Map[String, String]): OutputWriter
 
   // scalastyle:off argcount
