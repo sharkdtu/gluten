@@ -24,10 +24,12 @@ import org.apache.hadoop.fs.Path;
 import org.apache.iceberg.Metrics;
 import org.apache.iceberg.MetricsConfig;
 import org.apache.iceberg.Schema;
-import org.apache.iceberg.hadoop.HadoopInputFile;
 import org.apache.iceberg.io.FileAppender;
 import org.apache.iceberg.parquet.ParquetUtil;
 import org.apache.iceberg.relocated.com.google.common.base.Preconditions;
+import org.apache.iceberg.shaded.org.apache.parquet.hadoop.ParquetFileReader;
+import org.apache.iceberg.shaded.org.apache.parquet.hadoop.metadata.ParquetMetadata;
+import org.apache.iceberg.shaded.org.apache.parquet.hadoop.util.HadoopInputFile;
 import org.apache.spark.SparkConf;
 import org.apache.spark.SparkEnv;
 import org.apache.spark.deploy.SparkHadoopUtil;
@@ -38,7 +40,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.Closeable;
+import java.io.IOException;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable {
 
@@ -49,6 +54,7 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
   private long length;
   private boolean closed = false;
   private final Configuration hadoopConfiguration;
+  private ParquetMetadata footer;
 
   public GlutenParquetWriter(
       String filePath, StructType dataSchema, Map<String, String> nativeConf, Schema schema) {
@@ -65,6 +71,20 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
     this.schema = schema;
   }
 
+  private ParquetMetadata getFooter() {
+    if (footer == null) {
+      Path path = new Path(filePath);
+      try {
+        HadoopInputFile hadoopInputFile = HadoopInputFile.fromPath(path, hadoopConfiguration);
+        ParquetFileReader reader = ParquetFileReader.open(hadoopInputFile);
+        footer = reader.getFooter();
+      } catch (IOException e) {
+        throw new RuntimeException(e);
+      }
+    }
+    return footer;
+  }
+
   /** @param row row here is FakeRow. */
   @Override
   public void add(InternalRow row) {
@@ -77,11 +97,8 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
     Preconditions.checkState(closed, "Cannot return metrics for unclosed writer");
 
     long startMs = System.currentTimeMillis();
-    Path path = new Path(filePath);
-
     Metrics metrics =
-        ParquetUtil.fileMetrics(
-            HadoopInputFile.fromPath(path, hadoopConfiguration), MetricsConfig.getDefault());
+        ParquetUtil.footerMetrics(getFooter(), Stream.empty(), MetricsConfig.getDefault());
     LOG.info("Collecting metrics costs {} ms.", System.currentTimeMillis() - startMs);
     return metrics;
   }
@@ -89,6 +106,12 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
   @Override
   public long length() {
     return this.length;
+  }
+
+  @Override
+  public List<Long> splitOffsets() {
+    Preconditions.checkState(closed, "Cannot return split offsets for unclosed writer");
+    return ParquetUtil.getSplitOffsets(getFooter());
   }
 
   @Override
