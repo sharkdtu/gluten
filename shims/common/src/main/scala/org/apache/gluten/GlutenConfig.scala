@@ -1827,8 +1827,8 @@ object GlutenConfig {
     buildConf("spark.gluten.sql.columnar.backend.velox.abandonPartialAggregationMinPct")
       .internal()
       .doc(
-        "If partial aggregation input rows number greater than this value, "
-          + " partial aggregation may be early abandoned. Note: this option only works when " +
+        "If partial aggregation aggregationPct greater than this value, "
+          + "partial aggregation may be early abandoned. Note: this option only works when " +
           "flushable partial aggregation is enabled. Ignored when " +
           "spark.gluten.sql.columnar.backend.velox.flushablePartialAggregation=false.")
       .intConf
@@ -1838,8 +1838,8 @@ object GlutenConfig {
     buildConf("spark.gluten.sql.columnar.backend.velox.abandonPartialAggregationMinRows")
       .internal()
       .doc(
-        "If partial aggregation aggregationPct greater than this value, "
-          + "partial aggregation may be early abandoned. Note: this option only works when " +
+        "If partial aggregation input rows number greater than this value, "
+          + " partial aggregation may be early abandoned. Note: this option only works when " +
           "flushable partial aggregation is enabled. Ignored when " +
           "spark.gluten.sql.columnar.backend.velox.flushablePartialAggregation=false.")
       .intConf
