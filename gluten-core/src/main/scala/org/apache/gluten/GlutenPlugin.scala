@@ -31,6 +31,7 @@ import org.apache.spark.network.util.JavaUtils
 import org.apache.spark.softaffinity.SoftAffinityListener
 import org.apache.spark.sql.execution.ui.{GlutenEventUtils, GlutenSQLAppStatusListener}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.StaticSQLConf.SPARK_SESSION_EXTENSIONS
 import org.apache.spark.task.TaskResources
 import org.apache.spark.util.SparkResourceUtil
 
@@ -134,12 +135,12 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
           "are logically conflicting, can not be set to true at the same time.")
     }
 
-    conf.set(GlutenConfig.GLUTEN_OFFHEAP_ENABLED, "true")
+    conf.set(GlutenConfig.SPARK_OFFHEAP_ENABLED, "true")
     if (conf.getBoolean(GlutenConfig.GLUTEN_GEMINI_COLUMNAR_SHUFFLE_ENABLED, true)) {
       conf.set("spark.shuffle.manager", "org.apache.spark.shuffle.sort.ColumnarShuffleManager")
     }
 
-    val totalMemoryBytes = conf.getSizeAsBytes(GlutenConfig.GLUTEN_ONHEAP_SIZE_KEY)
+    val totalMemoryBytes = conf.getSizeAsBytes(GlutenConfig.SPARK_ONHEAP_SIZE_KEY)
     val offHeapFraction = conf.getDouble(GlutenConfig.GLUTEN_GEMINI_OFFHEAP_FRACTION, 0.75)
     if (offHeapFraction < 0 || offHeapFraction >= 1) {
       throw new IllegalArgumentException(
@@ -164,8 +165,8 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
     val onHeapSizeConfValue = (onHeapBytes / (1024 * 1024)) + "m"
     val offHeapSizeConfValue = (offHeapBytes / (1024 * 1024)) + "m"
 
-    conf.set(GlutenConfig.GLUTEN_ONHEAP_SIZE_KEY, onHeapSizeConfValue)
-    conf.set(GlutenConfig.GLUTEN_OFFHEAP_SIZE_KEY, offHeapSizeConfValue)
+    conf.set(GlutenConfig.SPARK_ONHEAP_SIZE_KEY, onHeapSizeConfValue)
+    conf.set(GlutenConfig.SPARK_OFFHEAP_SIZE_KEY, offHeapSizeConfValue)
     logInfo(
       s"Set on heap memory to $onHeapSizeConfValue and off heep memory to $offHeapSizeConfValue.")
 
@@ -179,14 +180,14 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
       prepareForGemini(conf)
     }
 
-    // sql extensions
-    val extensions = if (conf.contains(GlutenSessionExtensions.SPARK_SESSION_EXTS_KEY)) {
-      s"${conf.get(GlutenSessionExtensions.SPARK_SESSION_EXTS_KEY)}," +
+    // Spark SQL extensions
+    val extensions = if (conf.contains(SPARK_SESSION_EXTENSIONS.key)) {
+      s"${conf.get(SPARK_SESSION_EXTENSIONS.key)}," +
         s"${GlutenSessionExtensions.GLUTEN_SESSION_EXTENSION_NAME}"
     } else {
       s"${GlutenSessionExtensions.GLUTEN_SESSION_EXTENSION_NAME}"
     }
-    conf.set(GlutenSessionExtensions.SPARK_SESSION_EXTS_KEY, extensions)
+    conf.set(SPARK_SESSION_EXTENSIONS.key, extensions)
 
     // adaptive custom cost evaluator class
     if (GlutenConfig.getConf.enableGluten && GlutenConfig.getConf.enableGlutenCostEvaluator) {
