@@ -626,7 +626,7 @@ object GlutenConfig {
 
   val GLUTEN_COST_EVALUATOR_ENABLED = "spark.gluten.sql.adaptive.costEvaluator.enabled"
 
-  val GLUTEN_GEMINI_OFFHEAP_ENABLED = "spark.gluten.gemini.memory.offHeap.enabled"
+  val GLUTEN_GEMINI_ENABLED = "spark.gluten.gemini.enabled"
 
   val GLUTEN_GEMINI_OFFHEAP_FRACTION = "spark.gluten.gemini.memory.offHeap.fraction"
 

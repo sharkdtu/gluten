@@ -137,7 +137,7 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
   private def prepareForGemini(conf: SparkConf): Unit = {
     if (conf.getBoolean(GlutenConfig.GLUTEN_DYNAMIC_OFFHEAP_SIZING_ENABLED, false)) {
       throw new IllegalArgumentException(
-        s"${GlutenConfig.GLUTEN_GEMINI_OFFHEAP_ENABLED} and " +
+        s"${GlutenConfig.GLUTEN_GEMINI_ENABLED} and " +
           s"${GlutenConfig.GLUTEN_DYNAMIC_OFFHEAP_SIZING_ENABLED} " +
           "are logically conflicting, can not be set to true at the same time.")
     }
@@ -176,10 +176,14 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
     conf.set(GlutenConfig.GLUTEN_OFFHEAP_SIZE_KEY, offHeapSizeConfValue)
     logInfo(
       s"Set on heap memory to $onHeapSizeConfValue and off heep memory to $offHeapSizeConfValue.")
+
+    if (!conf.contains(GlutenConfig.NATIVE_WRITER_ENABLED.key)) {
+      conf.set(GlutenConfig.NATIVE_WRITER_ENABLED.key, "true")
+    }
   }
 
   private def setPredefinedConfigs(sc: SparkContext, conf: SparkConf): Unit = {
-    if (conf.getBoolean(GlutenConfig.GLUTEN_GEMINI_OFFHEAP_ENABLED, true)) {
+    if (conf.getBoolean(GlutenConfig.GLUTEN_GEMINI_ENABLED, true)) {
       prepareForGemini(conf)
     }
 
