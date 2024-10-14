@@ -209,8 +209,9 @@ object VeloxColumnarToRowExec {
 
       val row = new UnsafeRow(batch.numCols())
       row.pointTo(null, info.memoryAddress + info.offsets.head, info.lengths.head)
+      val copied = row.copy()
       jniWrapper.nativeClose(c2rId)
-      row
+      copied
     }
   }
 }
