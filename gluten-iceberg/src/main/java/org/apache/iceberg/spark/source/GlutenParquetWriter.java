@@ -55,6 +55,7 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
   private boolean closed = false;
   private final Configuration hadoopConfiguration;
   private ParquetMetadata footer;
+  private long numRecords;
 
   public GlutenParquetWriter(
       String filePath, StructType dataSchema, Map<String, String> nativeConf, Schema schema) {
@@ -69,9 +70,13 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
     this.filePath = filePath;
     this.length = 0;
     this.schema = schema;
+    this.numRecords = 0;
   }
 
   private ParquetMetadata getFooter() {
+    Preconditions.checkState(closed, "Cannot get footer for unclosed writer");
+    Preconditions.checkState(numRecords > 0, "Cannot get footer for empty file");
+
     if (footer == null) {
       Path path = new Path(filePath);
       try {
@@ -88,6 +93,7 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
   /** @param row row here is FakeRow. */
   @Override
   public void add(InternalRow row) {
+    numRecords++;
     NativeBatchWriteInfo info = nativeWriter.writeAndCollectInfo(row);
     this.length = info.numBytes;
   }
@@ -96,11 +102,17 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
   public Metrics metrics() {
     Preconditions.checkState(closed, "Cannot return metrics for unclosed writer");
 
-    long startMs = System.currentTimeMillis();
-    Metrics metrics =
-        ParquetUtil.footerMetrics(getFooter(), Stream.empty(), MetricsConfig.getDefault());
-    LOG.info("Collecting metrics costs {} ms.", System.currentTimeMillis() - startMs);
-    return metrics;
+    if (numRecords == 0) {
+      // If no record written, get footer will throw exception.
+      // The metrics will not be used, because iceberg will delete this file.
+      return new Metrics(0L, null, null, null, null);
+    } else {
+      long startMs = System.currentTimeMillis();
+      Metrics metrics =
+          ParquetUtil.footerMetrics(getFooter(), Stream.empty(), MetricsConfig.getDefault());
+      LOG.info("Collecting metrics costs {} ms.", System.currentTimeMillis() - startMs);
+      return metrics;
+    }
   }
 
   @Override
@@ -111,7 +123,13 @@ public class GlutenParquetWriter implements FileAppender<InternalRow>, Closeable
   @Override
   public List<Long> splitOffsets() {
     Preconditions.checkState(closed, "Cannot return split offsets for unclosed writer");
-    return ParquetUtil.getSplitOffsets(getFooter());
+    if (numRecords == 0) {
+      // If no record written, get footer will throw exception.
+      // The spilt offsets will not be used, because iceberg will delete this file.
+      return null;
+    } else {
+      return ParquetUtil.getSplitOffsets(getFooter());
+    }
   }
 
   @Override
