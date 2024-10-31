@@ -19,6 +19,7 @@
 
 #include <arrow/filesystem/localfs.h>
 #include <arrow/io/api.h>
+#include <sys/statvfs.h>
 
 #include "shuffle/PartitionWriter.h"
 #include "shuffle/ShuffleWriter.h"
@@ -121,5 +122,22 @@ class LocalPartitionWriter : public PartitionWriter {
   std::vector<int64_t> rawPartitionLengths_;
 
   int32_t lastEvictPid_{-1};
+
+  void checkDistFree(const std::string& path) {
+    struct statvfs stat;
+
+    if (statvfs(path.c_str(), &stat) != 0) {
+      throw gluten::GlutenException("Error getting file system statistics " + std::string(strerror(errno)));
+    }
+
+    int64_t usableSpace = static_cast<int64_t>(stat.f_bavail) * stat.f_frsize;
+    int64_t totalSpace = static_cast<int64_t>(stat.f_blocks) * stat.f_frsize;
+
+    double usage = 1.0 - usableSpace * 1.0 / totalSpace;
+
+    if (usage > options_.diskUsageThreshold) {
+      throw gluten::GlutenException("No space left on device.");
+    }
+  }
 };
 } // namespace gluten

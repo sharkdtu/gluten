@@ -527,6 +527,7 @@ arrow::Status LocalPartitionWriter::requestSpill(bool isFinal) {
       ARROW_ASSIGN_OR_RAISE(spillFile, createTempShuffleFile(nextSpilledFileDir()));
       ARROW_ASSIGN_OR_RAISE(os, openFile(spillFile));
     }
+    checkDistFree(spillFile);
     spiller_ = std::make_unique<LocalSpiller>(
         os, std::move(spillFile), options_.compressionThreshold, payloadPool_.get(), codec_.get());
   }

@@ -592,6 +592,9 @@ object GlutenConfig {
   val GLUTEN_SHUFFLE_WRITER_MERGE_THRESHOLD = "spark.gluten.sql.columnar.shuffle.merge.threshold"
   val GLUTEN_SHUFFLE_DEFUALT_COMPRESSION_BUFFER_SIZE = 32 * 1024
 
+  // Shuffle Write disk.
+  val SPARK_DISK_USAGE_THRESHOLD = "spark.disk.usage.threshold"
+
   // Controls whether to load DLL from jars. User can get dependent native libs packed into a jar
   // by executing dev/package.sh. Then, with that jar configured, Gluten can load the native libs
   // at runtime. This config is just for velox backend. And it is NOT applicable to the situation
@@ -668,6 +671,7 @@ object GlutenConfig {
       GLUTEN_TASK_OFFHEAP_SIZE_IN_BYTES_KEY,
       GLUTEN_MAX_BATCH_SIZE_KEY,
       GLUTEN_SHUFFLE_WRITER_BUFFER_SIZE,
+      SPARK_DISK_USAGE_THRESHOLD,
       SQLConf.SESSION_LOCAL_TIMEZONE.key,
       GLUTEN_DEFAULT_SESSION_TIMEZONE_KEY,
       SQLConf.LEGACY_SIZE_OF_NULL.key,

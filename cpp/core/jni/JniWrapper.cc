@@ -779,6 +779,7 @@ JNIEXPORT jlong JNICALL Java_org_apache_gluten_vectorized_ShuffleWriterJniWrappe
     jstring shuffleWriterTypeJstr) {
   JNI_METHOD_START
   auto ctx = gluten::getRuntime(env, wrapper);
+  auto& sparkConf = ctx->getConfMap();
   if (partitioningNameJstr == nullptr) {
     throw gluten::GlutenException(std::string("Short partitioning name can't be null"));
   }
@@ -795,9 +796,16 @@ JNIEXPORT jlong JNICALL Java_org_apache_gluten_vectorized_ShuffleWriterJniWrappe
       .compressionBufferSize = compressionBufferSize,
       .useRadixSort = static_cast<bool>(useRadixSort)};
 
+  double diskUsageThreshold = kDefaultDiskUsageThreshold;
+  auto it = sparkConf.find(kDiskUsageThreshold);
+  if (it != sparkConf.end()) {
+    diskUsageThreshold = std::stod(it->second);
+  }
+
   // Build PartitionWriterOptions.
   auto partitionWriterOptions = PartitionWriterOptions{
       .mergeBufferSize = mergeBufferSize,
+      .diskUsageThreshold = diskUsageThreshold,
       .mergeThreshold = mergeThreshold,
       .compressionThreshold = compressionThreshold,
       .compressionType = getCompressionType(env, codecJstr),

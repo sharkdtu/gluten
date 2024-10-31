@@ -60,6 +60,8 @@ const std::string kParquetCompressionCodec = "spark.sql.parquet.compression.code
 
 const std::string kColumnarToRowMemoryThreshold = "spark.gluten.sql.columnarToRowMemoryThreshold";
 
+const std::string kDiskUsageThreshold = "spark.disk.usage.threshold";
+
 const std::string kUGIUserName = "spark.gluten.ugi.username";
 const std::string kUGITokens = "spark.gluten.ugi.tokens";
 
