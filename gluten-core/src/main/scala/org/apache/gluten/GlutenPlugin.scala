@@ -169,6 +169,10 @@ private[gluten] class GlutenDriverPlugin extends DriverPlugin with Logging {
     if (!conf.contains(GlutenConfig.NATIVE_WRITER_ENABLED.key)) {
       conf.set(GlutenConfig.NATIVE_WRITER_ENABLED.key, "true")
     }
+
+    if (!conf.contains(GlutenConfig.COLUMNAR_SHUFFLE_SORT_COLUMNS_THRESHOLD.key)) {
+      conf.set(GlutenConfig.COLUMNAR_SHUFFLE_SORT_COLUMNS_THRESHOLD.key, "200")
+    }
   }
 
   private def setPredefinedConfigs(sc: SparkContext, conf: SparkConf): Unit = {
