@@ -109,3 +109,35 @@ case class VeloxHashExpressionTransformer(
     ExpressionBuilder.makeScalarFunction(functionId, nodes, typeNode)
   }
 }
+
+case class VeloxIcebergExpressionTransformer(
+    substraitExprName: String,
+    children: Seq[ExpressionTransformer],
+    original: Expression)
+  extends ExpressionTransformer {
+  override def doTransform(args: java.lang.Object): ExpressionNode = {
+    val (firstArgValue, firstArgType) = original match {
+      case IcebergBucketTransform(numBuckets, _) =>
+        (numBuckets, IntegerType)
+      case other =>
+        throw new IllegalArgumentException(s"No need to transform for ${other.getClass.getName}")
+    }
+
+    val childrenTypes = firstArgType +: original.children.map(child => child.dataType)
+
+    val functionMap = args.asInstanceOf[JHashMap[String, JLong]]
+    val functionName =
+      ConverterUtils.makeFuncName(substraitExprName, childrenTypes, FunctionConfig.OPT)
+    val functionId = ExpressionBuilder.newScalarFunction(functionMap, functionName)
+    val typeNode = ConverterUtils.getTypeNode(original.dataType, original.nullable)
+
+    val nodes = new JArrayList[ExpressionNode]()
+    nodes.add(ExpressionBuilder.makeIntLiteral(firstArgValue))
+    children.foreach(
+      expression => {
+        nodes.add(expression.doTransform(args))
+      })
+
+    ExpressionBuilder.makeScalarFunction(functionId, nodes, typeNode)
+  }
+}

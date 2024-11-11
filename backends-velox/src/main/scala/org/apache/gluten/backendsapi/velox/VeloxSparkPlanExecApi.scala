@@ -511,6 +511,19 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi {
     VeloxHashExpressionTransformer(substraitExprName, exprs, original)
   }
 
+  override def extraExpressionConverter(
+      substraitExprName: String,
+      expr: Expression,
+      attributeSeq: Seq[Attribute]): Option[ExpressionTransformer] = {
+    expr match {
+      case _: IcebergBucketTransform =>
+        val childrenTransformers =
+          expr.children.map(ExpressionConverter.replaceWithExpressionTransformer(_, attributeSeq))
+        Some(VeloxIcebergExpressionTransformer(substraitExprName, childrenTransformers, expr))
+      case _ => None
+    }
+  }
+
   /**
    * Generate ShuffleDependency for ColumnarShuffleExchangeExec.
    *
@@ -761,6 +774,8 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi {
       Sig[VeloxCollectSet](ExpressionNames.COLLECT_SET),
       Sig[VeloxBloomFilterMightContain](ExpressionNames.MIGHT_CONTAIN),
       Sig[VeloxBloomFilterAggregate](ExpressionNames.BLOOM_FILTER_AGG),
+      // For iceberg.
+      Sig[IcebergBucketTransform](IcebergExpressionNames.ICEBERG_BUCKET_TRANSFORM),
       // For test purpose.
       Sig[VeloxDummyExpression](VeloxDummyExpression.VELOX_DUMMY_EXPRESSION)
     )
