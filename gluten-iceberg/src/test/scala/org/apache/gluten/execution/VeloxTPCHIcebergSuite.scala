@@ -16,12 +16,11 @@
  */
 package org.apache.gluten.execution
 
-import org.apache.spark.SparkConf
-import org.apache.spark.sql.functions.col
+import java.io.File
 
 import org.apache.iceberg.spark.SparkWriteOptions
-
-import java.io.File
+import org.apache.spark.SparkConf
+import org.apache.spark.sql.functions.col
 
 class VeloxTPCHIcebergSuite extends VeloxTPCHSuite {
 

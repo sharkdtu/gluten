@@ -39,12 +39,6 @@
       <scope>compile</scope>
     </dependency>
     <dependency>
-      <groupId>org.apache.gluten</groupId>
-      <artifactId>gluten-iceberg</artifactId>
-      <version>${project.version}</version>
-      <scope>compile</scope>
-    </dependency>
-    <dependency>
       <groupId>io.glutenproject</groupId>
       <artifactId>protobuf-java</artifactId>
       <version>${custom.protobuf.version}</version>
@@ -162,12 +156,6 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-catalyst_${scala.binary.version}</artifactId>
       <type>test-jar</type>
-    </dependency>
-    <dependency>
-      <groupId>org.apache.iceberg</groupId>
-      <artifactId>iceberg-spark-runtime-${sparkbundle.version}_${scala.binary.version}</artifactId>
-      <version>${iceberg.version}</version>
-      <scope>provided</scope>
     </dependency>
     <!-- Fasterxml -->
     <dependency>

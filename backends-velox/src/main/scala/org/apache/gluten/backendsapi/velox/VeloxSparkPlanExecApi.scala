@@ -56,7 +56,12 @@ import org.apache.commons.lang3.ClassUtils
 
 import javax.ws.rs.core.UriBuilder
 
+import java.util.ServiceLoader
+
+import scala.collection.JavaConverters._
+
 class VeloxSparkPlanExecApi extends SparkPlanExecApi {
+  private val adaptors = ServiceLoader.load(classOf[VeloxAdaptor]).asScala
 
   /** Transform GetArrayItem to Substrait. */
   override def genGetArrayItemTransformer(
@@ -515,13 +520,13 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi {
       substraitExprName: String,
       expr: Expression,
       attributeSeq: Seq[Attribute]): Option[ExpressionTransformer] = {
-    expr match {
-      case _: IcebergBucketTransform =>
-        val childrenTransformers =
-          expr.children.map(ExpressionConverter.replaceWithExpressionTransformer(_, attributeSeq))
-        Some(VeloxIcebergExpressionTransformer(substraitExprName, childrenTransformers, expr))
-      case _ => None
+    for (adaptor <- adaptors) {
+      val res = adaptor.expressionConverter(substraitExprName, expr, attributeSeq)
+      if (res.nonEmpty) {
+        return res
+      }
     }
+    None
   }
 
   /**
@@ -774,11 +779,9 @@ class VeloxSparkPlanExecApi extends SparkPlanExecApi {
       Sig[VeloxCollectSet](ExpressionNames.COLLECT_SET),
       Sig[VeloxBloomFilterMightContain](ExpressionNames.MIGHT_CONTAIN),
       Sig[VeloxBloomFilterAggregate](ExpressionNames.BLOOM_FILTER_AGG),
-      // For iceberg.
-      Sig[IcebergBucketTransform](IcebergExpressionNames.ICEBERG_BUCKET_TRANSFORM),
       // For test purpose.
       Sig[VeloxDummyExpression](VeloxDummyExpression.VELOX_DUMMY_EXPRESSION)
-    )
+    ) ++ adaptors.flatMap(_.expressionMappings)
   }
 
   override def rewriteSpillPath(path: String): String = {
